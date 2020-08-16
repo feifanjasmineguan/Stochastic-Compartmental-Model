@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.stats import poisson
 from numpy import random
-import seaborn as sb
 import matplotlib.pyplot as plt
 
 class City:
@@ -153,51 +152,36 @@ class City:
 
     def transition(self):
         self.sus_expo_transition(2, 0.03)
+        self.expo_presymp_transition(3)
+        self.presymp_asymp_illl_transition(4, 0.8)
+        self.ill_dead_recovered_transition(5, 0.02)
+
         if(self.day_change_dist[0][1] <= self.population[0]):
 
             self.population[0] -= self.day_change_dist[0][1]
                     # susceptible population decrease
             self.population[1] += self.day_change_dist[0][1]
                     # exposed population increase
+            self.population[1] -= self.day_change_dist[0][2]
+                    # exposed population decrease
+            self.population[2] += self.day_change_dist[0][2]
+                    # presymptomatic population increase\
+            self.population[2] -= self.day_change_dist[0][3]
+                            # presymptomatic population decrease and become asymptomatic
+            self.population[3] += self.day_change_dist[0][3]
+                            # asymptomatic population increase
+            self.population[3] -= self.day_change_dist[0][4]
+                        # presymptomatic population decrease and become ill
+            self.population[4] += self.day_change_dist[0][4]
+                        # ill population increase
+            self.population[4] -= self.day_change_dist[0][5]
+                                    # ill population decrease to become dead
+            self.population[5] += self.day_change_dist[0][5]
+                                    # dead population increase
+            self.population[5] -= self.day_change_dist[0][6]
+                                    # ill population decrease to become recovered 
+            self.population[6] += self.day_change_dist[0][6]
     
-            self.expo_presymp_transition(3)
-            if(self.day_change_dist[0][2] <= self.population[1]):
-                self.population[1] -= self.day_change_dist[0][2]
-                            # exposed population decrease
-                self.population[2] += self.day_change_dist[0][2]
-                            # presymptomatic population increase
-            else:
-                self.can_transmit = False
-                return
-            
-            self.presymp_asymp_illl_transition(4, 0.8)
-            if(self.day_change_dist[0][3] <= self.population[2] and self.day_change_dist[0][4] <= self.population[3]):
-                self.population[2] -= self.day_change_dist[0][3]
-                        # presymptomatic population decrease and become asymptomatic
-                self.population[3] += self.day_change_dist[0][3]
-                        # asymptomatic population increase
-                self.population[3] -= self.day_change_dist[0][4]
-                    # presymptomatic population decrease and become ill
-                self.population[4] += self.day_change_dist[0][4]
-                    # ill population increase
-            else:
-                self.can_transmit = False
-                return
-
-            self.ill_dead_recovered_transition(5, 0.02)
-            if(self.day_change_dist[0][5] <= self.population[4] and self.day_change_dist[0][6] <= self.population[5]):
-                self.population[4] -= self.day_change_dist[0][5]
-                        # ill population decrease to become dead
-                self.population[5] += self.day_change_dist[0][5]
-                        # dead population increase
-                self.population[5] -= self.day_change_dist[0][6]
-                        # ill population decrease to become recovered 
-                self.population[6] += self.day_change_dist[0][6]
-                        # recovered population increase
-            else:
-                self.can_transmit = False
-                return 
-
             self.susceptible.append(self.population[0])
             self.exposed.append(self.population[1])
             self.presymptomatic.append(self.population[2])
