@@ -2,6 +2,7 @@ import numpy as np
 from scipy.stats import poisson
 from numpy import random
 import seaborn as sb
+import matplotlib.pyplot as plt
 
 class City:
     
@@ -25,16 +26,19 @@ class City:
         - days:  number of days we want to run the simulation for
 
 
-        >>> san_diego = City("San Diego", [2000, 0, 0, 0, 0, 0, 0], [0.4, 0.1], 10)
-        >>> san_diego.day_change_dist
+        >>> san_diego = City("San Diego", [1426000, 0, 0, 0, 0, 0, 0], [0.4, 0.1], 20)
         >>> print(san_diego.population_getter())
-        [2000, 0, 0, 0, 0, 0, 0]
-        >>> san_diego.transition()
         >>> san_diego.simulation()
+        >>> print(san_diego.days_simulated)
+
+
+        >>> san_diego.test_plot()
+
 
         
 
         """
+        self.num_days = days
         self.city_name = city_name
         self.population = population
 
@@ -45,9 +49,17 @@ class City:
         # 2d array as values of daily_change dict
         self.daily_change = [[0 for i in range(len(self.compartments))] for j in range(21)]
         self.day_change_dist = dict(zip(self.days, self.daily_change))
-        
+        self.days_simulated = 0
 
         self.transition_prob = transition_prob
+        self.can_transmit = True
+        self.susceptible = [self.population[0]]
+        self.exposed = [self.population[1]]
+        self.presymptomatic = [self.population[2]]
+        self.asymptomatic = [self.population[3]]
+        self.ill = [self.population[4]]
+        self.dead = [self.population[5]]
+        self.recovered = [self.population[6]]
        
 
 
@@ -67,6 +79,8 @@ class City:
 
     def day_change_dist(self):
         return self.day_change_dist
+
+    
 
 
 
@@ -89,6 +103,7 @@ class City:
     
     # Susceptible ---> Exposed 
     def sus_expo_transition(self, rate, expo_prop):
+        # THE DAY OF self.transition() being called
         x = []
         for i in range(21):
             x.append(poisson.pmf(i, rate))
@@ -98,6 +113,7 @@ class City:
 
     # Exposed ---> Presymptomatic 
     def expo_presymp_transition(self, rate):
+        # THE DAY OF self.transition() being called
         x = []
         for i in range(21):
             x.append(poisson.pmf(i, rate))
@@ -108,6 +124,7 @@ class City:
 
     # Presymptomatic ---> Asymptomatic Or Ill based on pre-symptomatic partition
     def presymp_asymp_illl_transition(self, rate, asmyp_prop):
+        # THE DAY OF self.transition() being called
         x = []
         for i in range(21):
             x.append(poisson.pmf(i, rate))
@@ -121,6 +138,7 @@ class City:
         
 
     def ill_dead_recovered_transition(self, rate, death_prop):
+        # THE DAY OF self.transition() being called
         x = []
         for i in range(21):
             x.append(poisson.pmf(i, rate))
@@ -134,29 +152,99 @@ class City:
         
 
     def transition(self):
-        self.sus_expo_transition(2, 0.3)
-        self.population[0] -= self.day_change_dist[0][1]
-        self.population[1] += self.day_change_dist[0][1]
-        self.expo_presymp_transition(3)
-        self.population[1] -= self.day_change_dist[0][2]
-        self.population[2] += self.day_change_dist[0][2]
-        self.presymp_asymp_illl_transition(4, 0.8)
-        self.population[2] -= self.day_change_dist[0][3]
-        self.population[2] -= self.day_change_dist[0][4]
-        self.population[3] += self.day_change_dist[0][3]
-        self.population[4] += self.day_change_dist[0][4]
-        self.ill_dead_recovered_transition(5, 0.2)
-        self.population[4] -= self.day_change_dist[0][5]
-        self.population[4] -= self.day_change_dist[0][6]
-        self.population[5] += self.day_change_dist[0][5]
-        self.population[6] += self.day_change_dist[0][6]
+        self.sus_expo_transition(2, 0.03)
+        if(self.day_change_dist[0][1] <= self.population[0]):
+
+            self.population[0] -= self.day_change_dist[0][1]
+                    # susceptible population decrease
+            self.population[1] += self.day_change_dist[0][1]
+                    # exposed population increase
+    
+            self.expo_presymp_transition(3)
+            if(self.day_change_dist[0][2] <= self.population[1]):
+                self.population[1] -= self.day_change_dist[0][2]
+                            # exposed population decrease
+                self.population[2] += self.day_change_dist[0][2]
+                            # presymptomatic population increase
+            else:
+                self.can_transmit = False
+                return
+            
+            self.presymp_asymp_illl_transition(4, 0.8)
+            if(self.day_change_dist[0][3] <= self.population[2] and self.day_change_dist[0][4] <= self.population[3]):
+                self.population[2] -= self.day_change_dist[0][3]
+                        # presymptomatic population decrease and become asymptomatic
+                self.population[3] += self.day_change_dist[0][3]
+                        # asymptomatic population increase
+                self.population[3] -= self.day_change_dist[0][4]
+                    # presymptomatic population decrease and become ill
+                self.population[4] += self.day_change_dist[0][4]
+                    # ill population increase
+            else:
+                self.can_transmit = False
+                return
+
+            self.ill_dead_recovered_transition(5, 0.02)
+            if(self.day_change_dist[0][5] <= self.population[4] and self.day_change_dist[0][6] <= self.population[5]):
+                self.population[4] -= self.day_change_dist[0][5]
+                        # ill population decrease to become dead
+                self.population[5] += self.day_change_dist[0][5]
+                        # dead population increase
+                self.population[5] -= self.day_change_dist[0][6]
+                        # ill population decrease to become recovered 
+                self.population[6] += self.day_change_dist[0][6]
+                        # recovered population increase
+            else:
+                self.can_transmit = False
+                return 
+
+            self.susceptible.append(self.population[0])
+            self.exposed.append(self.population[1])
+            self.presymptomatic.append(self.population[2])
+            self.asymptomatic.append(self.population[3])
+            self.ill.append(self.population[4])
+            self.dead.append(self.population[5])
+            self.recovered.append(self.population[6])
+            to_replace = list(self.day_change_dist.values())
+            to_replace.pop(0)
+            to_append = [0 for i in range(len(self.compartments))]
+            to_replace.append(to_append)
+            self.day_change_dist = dict(zip(self.days, to_replace))
+                # print(self.day_change_dist)
+        else:
+            self.can_transmit = False
+
+
+
+
 
 
     def simulation(self):
-        for i in range(self.days):
+        for i in range(self.num_days):
             self.transition()
-            # print(self.day_change_dist)
-            # print(self.population)
+            if(self.can_transmit == True): 
+                self.days_simulated +=1;
+            else:
+                break;
+
+
+
+    def test_plot(self):
+        # print(self.exposed)
+        # print(self.dead)
+        x = range(self.days_simulated+1)
+        plt.plot(x, self.susceptible, color = 'g')
+        plt.plot(x, self.exposed, color = 'r')
+        plt.plot(x, self.presymptomatic, color = 'm')
+        plt.plot(x, self.asymptomatic, color = 'orange')
+        plt.plot(x, self.ill, color = 'c')
+        plt.plot(x, self.dead, color = 'y')
+        plt.plot(x, self.recovered, color = 'b')
+        plt.show()
+
+
+
+            
   
 
 
